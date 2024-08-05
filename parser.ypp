@@ -1,0 +1,131 @@
+%{
+    #include <iostream>
+    #include "hw3_output.hpp"
+    #include "types.hpp"
+    #include "symbols.hpp"
+    #include <string>
+    #include "generator.hpp"
+    #include "cg.hpp"
+    using namespace std;
+
+    int yylex();
+    void yyerror(const char*);
+    extern int yylineno;
+    extern char* yytext;
+    extern ScopeStack* stack;
+    CodeBuffer& cb = CodeBuffer::instance();
+    int countLoop = 0;
+%}
+
+
+%nonassoc INT
+%nonassoc BYTE
+%nonassoc B
+%nonassoc BOOL
+%nonassoc TRUE
+%nonassoc FALSE
+%nonassoc RETURN
+%nonassoc IF
+%nonassoc WHILE
+%nonassoc BREAK
+%nonassoc CONTINUE
+%nonassoc SC
+%nonassoc COMMENT
+%nonassoc ID
+%nonassoc NUM
+%nonassoc STRING
+
+%right ASSIGN
+
+%left OR
+%left AND
+%left RELEQ
+%left RELOP
+%left ADDSUB
+%left MULDIV
+%right NOT
+%left LPAREN
+%left RPAREN
+%right ELSE
+%left LBRACE
+%left RBRACE
+
+
+%%
+
+Program : { stack = new ScopeStack();
+            stack->addScope(); stack->insertFunctions(); generateMainStart();} Statements {if(!yychar) {stack->removeScope(); delete stack;} generateMainEnd(); cb.printCodeBuffer();};
+
+Statements :    Statement {$$ = new Statements(dynamic_cast<Statement*>($1));} |
+                Statements Statement {$$ = new Statements(dynamic_cast<Statements*>($1),dynamic_cast<Statement*>($2));};
+
+Statement : LBRACE {stack->addScope();} Statements {stack->removeScope();} RBRACE|
+             Type ID SC {$$ = new Statement(dynamic_cast<Type*>($1), dynamic_cast<Id*>($2));} |
+             Type ID ASSIGN Exp SC {$$ = new Statement(dynamic_cast<Type*>($1),dynamic_cast<Id*>($2),dynamic_cast<Exp*>($4));} |
+             ID ASSIGN Exp SC {$$ = new Statement(dynamic_cast<Id*>($1), dynamic_cast<Exp*>($3));} |
+             Call SC {$$ = new Statement($1);} |
+             RETURN SC {$$ = new Statement(new Exp(), true);} |
+
+             IF LPAREN Exp RPAREN M1 Statement {$$ = new Statement("IF", dynamic_cast<Exp*>($3)); stack->removeScope();} |
+             IF LPAREN Exp RPAREN M1 Statement ELSE {stack->removeScope(); stack->addScope();} Statement { $$ = new Statement("IF ELSE", dynamic_cast<Exp*>($3)); stack->removeScope();} |
+
+             WHILE LPAREN Exp RPAREN {stack->addScope(); Exp::checkBool(dynamic_cast<Exp*>($3)); countLoop++;} Statement {new Statement("WHILE", dynamic_cast<Exp*>($3)); stack->removeScope(); countLoop--;} |
+             BREAK SC {
+                if (!countLoop) {
+                    output::errorUnexpectedBreak(yylineno);
+                    exit(1);
+                }
+             } |
+             CONTINUE SC {
+                if (!countLoop) {
+                    output::errorUnexpectedContinue(yylineno);
+                    exit(1);
+                }
+             };
+
+M1 : %empty { Exp::checkBool(dynamic_cast<Exp*>($-1)); stack->addScope(); }
+
+Call : ID LPAREN Exp RPAREN {
+            $$ = new Call(dynamic_cast<Id*>($1),dynamic_cast<Exp*>($3));
+        };
+
+Type :   INT {$$ = new Type("INT");} |
+         BYTE {$$ = new Type("BYTE");} |
+         BOOL {$$ = new Type("BOOL");};
+
+Exp :    LPAREN Exp RPAREN {$$ = $2;} |
+         Exp ADDSUB Exp {Exp::checkNumeric(dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3)); $$ = new Exp(Exp::resultType(dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3)));
+                            dynamic_cast<Exp*>($$)->var = Operator::opCommand(dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3),dynamic_cast<Operator*>($2));
+                            }|
+
+         Exp MULDIV Exp {Exp::checkNumeric(dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3)); $$ = new Exp(Exp::resultType(dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3)));
+                            dynamic_cast<Exp*>($$)->var = Operator::opCommand(dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3),dynamic_cast<Operator*>($2));
+                             }|
+
+         ID {$$ = new Exp(dynamic_cast<Id*>($1)); dynamic_cast<Exp*>($$)->var = freshVar();} |
+         Call {$$ = new Exp(dynamic_cast<Call*>($1)); dynamic_cast<Exp*>($$)->var = freshVar();} |
+         NUM {$$ = new Exp("INT"); dynamic_cast<Exp*>($$)->var = freshVar();} |
+         NUM B { dynamic_cast<Num*>($1)->checkNumByte(); $$ = new Exp("BYTE"); dynamic_cast<Exp*>($$)->var = freshVar();} |
+         STRING {$$ = new Exp("STRING");} |
+         TRUE {$$ = new Exp("BOOL"); dynamic_cast<Exp*>($$)->var = freshVar();} |
+         FALSE {$$ = new Exp("BOOL"); dynamic_cast<Exp*>($$)->var = freshVar();} |
+         NOT Exp {Exp::checkBool(dynamic_cast<Exp*>($2)); $$ = $2;} |
+         Exp AND Exp {Exp::checkBool(dynamic_cast<Exp*>($1)); Exp::checkBool(dynamic_cast<Exp*>($3)); $$ = $1;} |
+         Exp OR Exp {Exp::checkBool(dynamic_cast<Exp*>($1)); Exp::checkBool(dynamic_cast<Exp*>($3)); $$ = $1;} |
+         Exp RELOP Exp {Exp::checkNumeric(dynamic_cast<Exp*>($1), dynamic_cast<Exp*>($3)); $$ = new Exp("BOOL");
+          dynamic_cast<Exp*>($$)->var = relopCommand(dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3),dynamic_cast<Operator*>($2)); } |
+         Exp RELEQ Exp {Exp::checkNumeric(dynamic_cast<Exp*>($1), dynamic_cast<Exp*>($3)); $$ = new Exp("BOOL"); dynamic_cast<Exp*>($$)->var = freshVar();} |
+         LPAREN Type RPAREN Exp {Type* type = dynamic_cast<Type*>($2);
+                                     Exp* exp = dynamic_cast<Exp*>($4);
+                                     Exp::checkCasting(type, exp);
+                                     $$ = new Exp(exp, type);
+                                     dynamic_cast<Exp*>($$)->var = freshVar();}
+
+%%
+
+
+void yyerror (const char*) { output::errorSyn(yylineno); exit(1);}
+
+int main() {
+    return yyparse();
+}
