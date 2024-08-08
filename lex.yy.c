@@ -944,7 +944,7 @@ YY_RULE_SETUP
 case 23:
 YY_RULE_SETUP
 #line 45 "scanner.lex"
-{  return RELEQ; }
+{  yylval = new Operator(yytext); return RELEQ; }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP

@@ -14,6 +14,7 @@
     extern char* yytext;
     extern ScopeStack* stack;
     CodeBuffer& cb = CodeBuffer::instance();
+    std::string sp = freshVar();
     int countLoop = 0;
 %}
 
@@ -54,20 +55,35 @@
 %%
 
 Program : { stack = new ScopeStack();
-            stack->addScope(); stack->insertFunctions(); generateMainStart();} Statements {if(!yychar) {stack->removeScope(); delete stack;} generateMainEnd(); cb.printCodeBuffer();};
+            stack->addScope(); stack->insertFunctions();
+            generateMainStart(sp);
+
+          } Statements {if(!yychar) {stack->removeScope(); delete stack;} generateMainEnd(); cb.printCodeBuffer();};
 
 Statements :    Statement {$$ = new Statements(dynamic_cast<Statement*>($1));} |
                 Statements Statement {$$ = new Statements(dynamic_cast<Statements*>($1),dynamic_cast<Statement*>($2));};
 
 Statement : LBRACE {stack->addScope();} Statements {stack->removeScope();} RBRACE|
-             Type ID SC {$$ = new Statement(dynamic_cast<Type*>($1), dynamic_cast<Id*>($2));} |
-             Type ID ASSIGN Exp SC {$$ = new Statement(dynamic_cast<Type*>($1),dynamic_cast<Id*>($2),dynamic_cast<Exp*>($4));} |
+             Type ID SC {
+                $$ = new Statement(dynamic_cast<Type*>($1), dynamic_cast<Id*>($2));
+             } |
+             Type ID ASSIGN Exp SC {
+                $$ = new Statement(dynamic_cast<Type*>($1),dynamic_cast<Id*>($2),dynamic_cast<Exp*>($4));
+             } |
              ID ASSIGN Exp SC {$$ = new Statement(dynamic_cast<Id*>($1), dynamic_cast<Exp*>($3));} |
              Call SC {$$ = new Statement($1);} |
              RETURN SC {$$ = new Statement(new Exp(), true);} |
 
-             IF LPAREN Exp RPAREN M1 Statement {$$ = new Statement("IF", dynamic_cast<Exp*>($3)); stack->removeScope();} |
-             IF LPAREN Exp RPAREN M1 Statement ELSE {stack->removeScope(); stack->addScope();} Statement { $$ = new Statement("IF ELSE", dynamic_cast<Exp*>($3)); stack->removeScope();} |
+             IF LPAREN Exp RPAREN M1 Statement {
+                $$ = new Statement("IF", dynamic_cast<Exp*>($3));
+                stack->removeScope();
+                cb.emit(dynamic_cast<Exp*>($3)->falseLabel + ":");
+             } |
+             IF LPAREN Exp RPAREN M1 Statement N ELSE {stack->removeScope(); stack->addScope(); cb.emit(dynamic_cast<Exp*>($3)->falseLabel + ":");} Statement {
+                $$ = new Statement("IF ELSE", dynamic_cast<Exp*>($3));
+                stack->removeScope();
+                cb.emit(dynamic_cast<N*>($7)->next + ":");
+             } |
 
              WHILE LPAREN Exp RPAREN {stack->addScope(); Exp::checkBool(dynamic_cast<Exp*>($3)); countLoop++;} Statement {new Statement("WHILE", dynamic_cast<Exp*>($3)); stack->removeScope(); countLoop--;} |
              BREAK SC {
@@ -83,7 +99,16 @@ Statement : LBRACE {stack->addScope();} Statements {stack->removeScope();} RBRAC
                 }
              };
 
-M1 : %empty { Exp::checkBool(dynamic_cast<Exp*>($-1)); stack->addScope(); }
+M1 : %empty {
+            Exp::checkBool(dynamic_cast<Exp*>($-1));
+            stack->addScope();
+            cb.emit(dynamic_cast<Exp*>($-1)->trueLabel + ":");
+         }
+
+N : %empty {
+            $$ = new N(cb.freshLabel());
+            cb.emit("br label %" + dynamic_cast<N*>($$)->next);
+        }
 
 Call : ID LPAREN Exp RPAREN {
             $$ = new Call(dynamic_cast<Id*>($1),dynamic_cast<Exp*>($3));
@@ -95,26 +120,40 @@ Type :   INT {$$ = new Type("INT");} |
 
 Exp :    LPAREN Exp RPAREN {$$ = $2;} |
          Exp ADDSUB Exp {Exp::checkNumeric(dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3)); $$ = new Exp(Exp::resultType(dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3)));
-                            dynamic_cast<Exp*>($$)->var = Operator::opCommand(dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3),dynamic_cast<Operator*>($2));
+                            opCommand(dynamic_cast<Exp*>($$), dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3),dynamic_cast<Operator*>($2));
                             }|
 
          Exp MULDIV Exp {Exp::checkNumeric(dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3)); $$ = new Exp(Exp::resultType(dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3)));
-                            dynamic_cast<Exp*>($$)->var = Operator::opCommand(dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3),dynamic_cast<Operator*>($2));
+                            opCommand(dynamic_cast<Exp*>($$), dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3),dynamic_cast<Operator*>($2));
                              }|
 
-         ID {$$ = new Exp(dynamic_cast<Id*>($1)); dynamic_cast<Exp*>($$)->var = freshVar();} |
+         ID {
+            $$ = new Exp(dynamic_cast<Id*>($1));
+         } |
          Call {$$ = new Exp(dynamic_cast<Call*>($1)); dynamic_cast<Exp*>($$)->var = freshVar();} |
-         NUM {$$ = new Exp("INT"); dynamic_cast<Exp*>($$)->var = freshVar();} |
-         NUM B { dynamic_cast<Num*>($1)->checkNumByte(); $$ = new Exp("BYTE"); dynamic_cast<Exp*>($$)->var = freshVar();} |
+         NUM {$$ = new Exp("INT"); numCommand(dynamic_cast<Exp*>($$), dynamic_cast<Num*>($1)); } |
+         NUM B { dynamic_cast<Num*>($1)->checkNumByte(); $$ = new Exp("BYTE"); numCommand(dynamic_cast<Exp*>($$), dynamic_cast<Num*>($1)); } |
          STRING {$$ = new Exp("STRING");} |
-         TRUE {$$ = new Exp("BOOL"); dynamic_cast<Exp*>($$)->var = freshVar();} |
-         FALSE {$$ = new Exp("BOOL"); dynamic_cast<Exp*>($$)->var = freshVar();} |
-         NOT Exp {Exp::checkBool(dynamic_cast<Exp*>($2)); $$ = $2;} |
-         Exp AND Exp {Exp::checkBool(dynamic_cast<Exp*>($1)); Exp::checkBool(dynamic_cast<Exp*>($3)); $$ = $1;} |
-         Exp OR Exp {Exp::checkBool(dynamic_cast<Exp*>($1)); Exp::checkBool(dynamic_cast<Exp*>($3)); $$ = $1;} |
+         TRUE {$$ = new Exp("BOOL"); trueCommand(dynamic_cast<Exp*>($$));} |
+         FALSE {$$ = new Exp("BOOL"); falseCommand(dynamic_cast<Exp*>($$));} |
+         NOT Exp {Exp::checkBool(dynamic_cast<Exp*>($2)); $$ = $2; notCommand(dynamic_cast<Exp*>($$));} |
+         Exp { cb.emit(dynamic_cast<Exp*>($1)->trueLabel + ":"); } AND Exp {
+            Exp::checkBool(dynamic_cast<Exp*>($1));
+            Exp::checkBool(dynamic_cast<Exp*>($4));
+            $$ = new Exp("BOOL");
+            andCommand(dynamic_cast<Exp*>($$), dynamic_cast<Exp*>($1), dynamic_cast<Exp*>($4));
+         } |
+
+         Exp { cb.emit(dynamic_cast<Exp*>($1)->falseLabel + ":"); } OR Exp {
+            Exp::checkBool(dynamic_cast<Exp*>($1));
+            Exp::checkBool(dynamic_cast<Exp*>($4));
+            $$ = new Exp("BOOL");
+            orCommand(dynamic_cast<Exp*>($$), dynamic_cast<Exp*>($1), dynamic_cast<Exp*>($4));
+         } |
          Exp RELOP Exp {Exp::checkNumeric(dynamic_cast<Exp*>($1), dynamic_cast<Exp*>($3)); $$ = new Exp("BOOL");
-          dynamic_cast<Exp*>($$)->var = relopCommand(dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3),dynamic_cast<Operator*>($2)); } |
-         Exp RELEQ Exp {Exp::checkNumeric(dynamic_cast<Exp*>($1), dynamic_cast<Exp*>($3)); $$ = new Exp("BOOL"); dynamic_cast<Exp*>($$)->var = freshVar();} |
+         relopCommand(dynamic_cast<Exp*>($$), dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3),dynamic_cast<Operator*>($2)); } |
+         Exp RELEQ Exp {Exp::checkNumeric(dynamic_cast<Exp*>($1), dynamic_cast<Exp*>($3)); $$ = new Exp("BOOL");
+         releqCommand(dynamic_cast<Exp*>($$), dynamic_cast<Exp*>($1),dynamic_cast<Exp*>($3),dynamic_cast<Operator*>($2));} |
          LPAREN Type RPAREN Exp {Type* type = dynamic_cast<Type*>($2);
                                      Exp* exp = dynamic_cast<Exp*>($4);
                                      Exp::checkCasting(type, exp);

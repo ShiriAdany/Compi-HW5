@@ -36,6 +36,11 @@ Statement::Statement(Node* node) {
 
 Statement::Statement(Type* type, Id* id) {
     Symbol* sym = new Symbol(id->name,stack->offsets.back(),type->type);
+
+    std::string ptr = freshVar();
+    cb.emit("%" + ptr + " = getelementptr i32, i32* %" + sp + ", i32 " + to_string(stack->offsets.back()));
+    cb.emit("store i32 0, i32* %" + ptr);
+
     stack->insertSymbol(*sym);
 }
 
@@ -45,6 +50,25 @@ Statement::Statement(Type* type, Id* id, Exp* exp) {
         exit(1);
     }
     Symbol* sym = new Symbol(id->name,stack->offsets.back(),type->type);
+    // if bool or byte, zero extend
+    if (type->type == "BOOL") {
+        std::string endLabel = cb.freshLabel();
+        cb.emit(exp->trueLabel + ":");
+        cb.emit("br label %" + endLabel);
+        cb.emit(exp->falseLabel + ":");
+        cb.emit("br label %" + endLabel);
+        cb.emit(endLabel + ":");
+
+        exp->var = freshVar();
+        cb.emit("%" + exp->var + "= phi i32 [ 1, %" + exp->trueLabel + " ], [ 0, %" + exp->falseLabel + " ]");
+
+    } else if (type->type == "BYTE") {
+        cb.emit("%" + exp->var + " = zext i8 %" + exp->var + " to i32");
+    }
+
+    std::string ptr = freshVar();
+    cb.emit("%" + ptr + " = getelementptr i32, i32* %" + sp + ", i32 " + to_string(stack->offsets.back()));
+    cb.emit("store i32 %" + exp->var + ", i32* %" + ptr);
     stack->insertSymbol(*sym);
 }
 
@@ -67,6 +91,25 @@ Statement::Statement(Id* id, Exp* exp) {
         output::errorMismatch(yylineno);
         exit(1);
     }
+
+    if (sym->type == "BOOL") {
+        std::string endLabel = cb.freshLabel();
+        cb.emit(exp->trueLabel + ":");
+        cb.emit("br label %" + endLabel);
+        cb.emit(exp->falseLabel + ":");
+        cb.emit("br label %" + endLabel);
+        cb.emit(endLabel + ":");
+
+        exp->var = freshVar();
+        cb.emit("%" + exp->var + "= phi i32 [ 1, %" + exp->trueLabel + " ], [ 0, %" + exp->falseLabel + " ]");
+
+    } else if (sym->type == "BYTE") {
+        cb.emit("%" + exp->var + " = zext i8 %" + exp->var + " to i32");
+    }
+
+    std::string ptr = freshVar();
+    cb.emit("%" + ptr + " = getelementptr i32, i32* %" + sp + ", i32 " + to_string(sym->offset));
+    cb.emit("store i32 %" + exp->var + ", i32* %" + ptr);
 }
 
 
@@ -111,28 +154,33 @@ void Call::checkFunc(Symbol* sym, Exp* exp) {
 Type::Type(const std::string& type) : type(type) {}
 
 //------------------------------------------------------------------
-Exp::Exp(Exp *exp) : type(exp->type) {}
+Exp::Exp(Exp *exp) : type(exp->type), var(exp->var) {}
 
-Exp::Exp(Exp* exp,Type *type) {
+Exp::Exp(Exp* exp, Type *type) {
 
     Type* casted_type = dynamic_cast<Type*>(type);
     this->type = casted_type->type;
+    this->var = exp->var;
 
 }
 
-Exp::Exp(const std::string& type):type(type){}
+Exp::Exp(const std::string& type):type(type), var(""){}
 
 Exp::Exp(Id* id)
 {
     Symbol *symbol = stack->search(id->name, false);
     type = symbol->type;
-
+    var = freshVar();
+    std::string ptr = freshVar();
+    cb.emit("%" + ptr + " = getelementptr i32, i32* %" + sp + ", i32 " + to_string(symbol->offset));
+    cb.emit("%" + var + " = load i32, i32* %" + ptr);
 }
 
 Exp::Exp(Call* call)
 {
     //Symbol *symbol = stack->search(call->name, true);
     type = call->returnType;
+    // todo: ?
 
 }
 void Exp::checkNumeric(Exp* left, Exp* right) {
@@ -169,36 +217,3 @@ std::string Exp::resultType(Exp* left, Exp* right) {
 //-------------------------------------------------
 
 Operator::Operator(const std::string &o) : op(o){}
-
-std::string Operator::opCommand(Exp* left, Exp* right, Operator* o){
-    std::string type = Exp::resultType(left,right);
-    std::string op = "";
-    std::string res = "";
-    if(o->op == "+") op = "add";
-    else if (o->op == "-") op = "sub";
-    else if (o->op == "*") op = "mul";
-    else{
-        if(type == "INT") op = "sdiv";
-        else op = "udiv";
-        std::string cond = freshVar();
-        std::string errorDiv = cb.freshLabel();
-        std::string goodDiv = cb.freshLabel();
-
-
-        res = "%" + cond + "=icmp eq i32 0 %" + right->var + "\n" +
-        "br i1 %" + cond + ",label %" + errorDiv + " ,label %" + goodDiv + "\n" +
-        errorDiv  + ":" + "\n" +
-        "call i32 (i8*, ...) @printf(i8* getelementptr ([23 x i8], [23 x i8]* @.divZero, i32 0, i32 0))" + "\n" +
-        "ret i32 0" + "\n" +
-        goodDiv + ":" + "\n";
-
-    }
-    std::string target = freshVar();
-    res += "%" + target + " = " + op + " " + "i32" + " %" + left->var + " %" + right->var;
-    if(type == "BYTE")
-    {
-        res += "\n%" + target + " = " + "and i32 %" + target+ ", 255";
-    }
-    cb.emit(res);
-    return target;
-}

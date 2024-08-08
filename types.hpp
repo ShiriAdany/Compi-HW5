@@ -8,6 +8,7 @@
 
 extern int yylineno;
 extern CodeBuffer& cb;
+extern std::string sp;
 
 struct Node {
     std::string value;
@@ -57,7 +58,9 @@ class Exp : public Node {
 public:
     std::string type;
     std::string var;
-    Exp() : type("void"){}
+    std::string trueLabel;
+    std::string falseLabel;
+    Exp() : type("void"), var("") {}
     Exp(Exp *exp);
     Exp(Id* id);
     Exp(Call* call);
@@ -74,7 +77,6 @@ class Operator : public Node{
 public:
     std::string op;
     Operator(const std::string& o);
-    static std::string opCommand(Exp* left, Exp* right, Operator* o);
 
 };
 
@@ -113,6 +115,10 @@ public:
     virtual ~Statements() = default;
 };
 
-
+class N : public Node {
+public:
+    std::string next;
+    N(const std::string& s) : next(s) {};
+};
 
 

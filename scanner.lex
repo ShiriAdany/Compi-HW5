@@ -42,7 +42,7 @@ continue            { yylval = new Node(yytext);  return CONTINUE; }
 \{                  {  return LBRACE; }
 \}                  {  return RBRACE; }
 =                   {  return ASSIGN; }
-==|!=               {  return RELEQ; }
+==|!=               {  yylval = new Operator(yytext); return RELEQ; }
 \<=|\>=             {  yylval = new Operator(yytext); return RELOP; }
 \<|\>               {  yylval = new Operator(yytext); return RELOP; }
 [*|/]               {  yylval = new Operator(yytext); return MULDIV; }
