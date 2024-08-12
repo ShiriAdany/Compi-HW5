@@ -94,6 +94,7 @@ class Program : public Node {};
 
 class Statement : public Node {
 public:
+    std::string nextLabel;
     Statement(Node* node);
     Statement(Type* type, Id* id, Exp* exp);
     Statement(Type* type, Id* id);

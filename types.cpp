@@ -30,11 +30,11 @@ Id::Id(const std::string& n) : name(n) {}
 String::String(const std::string& v) : val(v) {}
 
 //------------------------------------------------------------------
-Statement::Statement(Node* node) {
+Statement::Statement(Node* node){
     // Constructor implementation
 }
 
-Statement::Statement(Type* type, Id* id) {
+Statement::Statement(Type* type, Id* id){
     Symbol* sym = new Symbol(id->name,stack->offsets.back(),type->type);
 
     std::string ptr = freshVar();
@@ -44,7 +44,7 @@ Statement::Statement(Type* type, Id* id) {
     stack->insertSymbol(*sym);
 }
 
-Statement::Statement(Type* type, Id* id, Exp* exp) {
+Statement::Statement(Type* type, Id* id, Exp* exp){
     if (!checkAssign(type->type, exp->type)) {
         output::errorMismatch(yylineno);
         exit(1);
@@ -63,7 +63,9 @@ Statement::Statement(Type* type, Id* id, Exp* exp) {
         cb.emit("%" + exp->var + "= phi i32 [ 1, %" + exp->trueLabel + " ], [ 0, %" + exp->falseLabel + " ]");
 
     } else if (type->type == "BYTE") {
-        cb.emit("%" + exp->var + " = zext i8 %" + exp->var + " to i32");
+        std::string tempVar = freshVar();
+        cb.emit("%" + tempVar + " = and i32 %" + exp->var + ", 255");
+        exp->var = tempVar;
     }
 
     std::string ptr = freshVar();
@@ -85,7 +87,7 @@ bool Statement::checkAssign(std::string& left, std::string& right) {
 }
 
 
-Statement::Statement(Id* id, Exp* exp) {
+Statement::Statement(Id* id, Exp* exp){
     Symbol* sym = stack->search(id->name, false);
     if (!checkAssign(sym->type, exp->type)) {
         output::errorMismatch(yylineno);
@@ -104,7 +106,9 @@ Statement::Statement(Id* id, Exp* exp) {
         cb.emit("%" + exp->var + "= phi i32 [ 1, %" + exp->trueLabel + " ], [ 0, %" + exp->falseLabel + " ]");
 
     } else if (sym->type == "BYTE") {
-        cb.emit("%" + exp->var + " = zext i8 %" + exp->var + " to i32");
+        std::string tempVar = freshVar();
+        cb.emit("%" + tempVar + " = and i32 %" + exp->var + ", 255");
+        exp->var = tempVar;
     }
 
     std::string ptr = freshVar();
@@ -113,15 +117,15 @@ Statement::Statement(Id* id, Exp* exp) {
 }
 
 
-Statement::Statement(const std::string name, Exp* exp) {
+Statement::Statement(const std::string name, Exp* exp){
+
+}
+
+Statement::Statement(Exp* exp, bool is_return){
     // Constructor implementation
 }
 
-Statement::Statement(Exp* exp, bool is_return) {
-    // Constructor implementation
-}
-
-Statement::Statement(Call* call) {
+Statement::Statement(Call* call){
     // Constructor implementation
 }
 
@@ -133,6 +137,10 @@ Call::Call(Id* id, Exp* exp){
     this->returnType = sym->type;
     this->argType = sym->argType;
     this->name = sym->name;
+    std::string retVal = freshVar();
+    "call i32 @fn_fib(i32 10)"
+    if (returnType == "INT")
+    cb.emit("call ")
 }
 
 void Call::checkFunc(Symbol* sym, Exp* exp) {
@@ -174,6 +182,17 @@ Exp::Exp(Id* id)
     std::string ptr = freshVar();
     cb.emit("%" + ptr + " = getelementptr i32, i32* %" + sp + ", i32 " + to_string(symbol->offset));
     cb.emit("%" + var + " = load i32, i32* %" + ptr);
+
+    if(type == "BOOL"){
+        std::string trueLab = cb.freshLabel();
+        std::string falseLab = cb.freshLabel();
+        std::string cond = freshVar();
+        cb.emit("%" + cond + "=icmp eq i32 0 ,%" + var);
+        cb.emit("br i1 %" + cond + ",label %" + falseLab + " ,label %" + trueLab);
+        trueLabel = trueLab;
+        falseLabel = falseLab;
+    }
+
 }
 
 Exp::Exp(Call* call)

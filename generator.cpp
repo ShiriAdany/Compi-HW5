@@ -9,10 +9,16 @@ std::string freshVar() {
 }
 
 void generateMainStart(const std::string& sp) {
+    std::ifstream file("print_functions.llvm");
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string funcs = buffer.str();
+    cb.emit(funcs);
+
+    cb.emit("@.divZero = internal constant [23 x i8] c\"Error division by zero\\00\"\n");
     cb.emit("define i32 @main(){\n");
-    cb.emit("declare i32 @printf(i8*, ...)\ndeclare void @exit(i32)\ndeclare i32 @scanf(i8*, ...)");
-    cb.emit("@.divZero = internal constant [23 x i8] c\"Error division by zero\\00\"");
     cb.emit("%" + sp + " = alloca i32, i32 50");
+
 }
 
 void generateMainEnd() {
@@ -34,7 +40,7 @@ void opCommand(Exp* e, Exp* left, Exp* right, Operator* o){
         std::string goodDiv = cb.freshLabel();
 
 
-        res = "%" + cond + "=icmp eq i32 0 %" + right->var + "\n" +
+        res = "%" + cond + "=icmp eq i32 0 ,%" + right->var + "\n" +
               "br i1 %" + cond + ",label %" + errorDiv + " ,label %" + goodDiv + "\n" +
               errorDiv  + ":" + "\n" +
               "call i32 (i8*, ...) @printf(i8* getelementptr ([23 x i8], [23 x i8]* @.divZero, i32 0, i32 0))" + "\n" +
@@ -43,10 +49,12 @@ void opCommand(Exp* e, Exp* left, Exp* right, Operator* o){
 
     }
     std::string target = freshVar();
-    res += "%" + target + " = " + op + " " + "i32" + " %" + left->var + " %" + right->var;
+    res += "%" + target + " = " + op + " " + "i32" + " %" + left->var + ", %" + right->var;
     if(type == "BYTE")
     {
-        res += "\n%" + target + " = " + "and i32 %" + target+ ", 255";
+        std::string tmpVar = freshVar();
+        res += "\n%" + tmpVar + " = " + "and i32 %" + target+ ", 255";
+        target = tmpVar;
     }
     cb.emit(res);
     e->var = target;
@@ -66,7 +74,7 @@ void relopCommand(Exp* e, Exp* left, Exp* right, Operator* o)
     else if (o->op == ">") relop += "gt";
     else relop += "ge";
 
-    cb.emit("%" + cond + " = icmp " + relop + " i32 %" + left->var + " %" + right->var);
+    cb.emit("%" + cond + " = icmp " + relop + " i32 %" + left->var + ", %" + right->var);
     cb.emit("br i1 %" + cond + ", label %" + trueLab + ", label %" + falseLab);
 
     e->trueLabel = trueLab;
@@ -84,7 +92,7 @@ void releqCommand(Exp* e, Exp* left, Exp* right, Operator* o)
     if(o->op == "==") releq += "eq";
     else releq += "ne";
 
-    cb.emit("%" + target + " = icmp " + releq + " i32 %" + left->var + " %" + right->var);
+    cb.emit("%" + target + " = icmp " + releq + " i32 %" + left->var + ", %" + right->var);
     cb.emit("br i1 %" + target + ", label %" + trueLab + ", label %" + falseLab);
 
     e->trueLabel = trueLab;

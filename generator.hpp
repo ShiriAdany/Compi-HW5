@@ -3,6 +3,8 @@
 #include <string>
 #include "cg.hpp"
 #include "types.hpp"
+#include <fstream>
+#include <sstream>
 
 // Forward declarations
 class Exp;
