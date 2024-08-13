@@ -60,7 +60,7 @@ Program : { stack = new ScopeStack();
             stack->addScope(); stack->insertFunctions();
             generateMainStart(sp);
 
-          } Statements {if(!yychar) {stack->removeScope(); delete stack;} generateMainEnd(); cb.printCodeBuffer();};
+          } Statements {if(!yychar) {stack->removeScope(); delete stack;} generateMainEnd(); cb.printGlobalBuffer();cb.printCodeBuffer();};
 
 Statements :    Statement {$$ = new Statements(dynamic_cast<Statement*>($1));} |
                 Statements Statement {$$ = new Statements(dynamic_cast<Statements*>($1),dynamic_cast<Statement*>($2));};
@@ -82,6 +82,7 @@ Statement : LBRACE {stack->addScope();} Statements {stack->removeScope();} RBRAC
              IF LPAREN Exp RPAREN M1 Statement {
                 $$ = new Statement("IF", dynamic_cast<Exp*>($3));
                 stack->removeScope();
+                cb.emit("br label %" + dynamic_cast<Exp*>($3)->falseLabel);
                 cb.emit(dynamic_cast<Exp*>($3)->falseLabel + ":");
              } |
              IF LPAREN Exp RPAREN M1 Statement ELSE N {stack->removeScope(); stack->addScope(); cb.emit(dynamic_cast<Exp*>($3)->falseLabel + ":");} Statement {
@@ -154,10 +155,10 @@ Exp :    LPAREN Exp RPAREN {$$ = $2;} |
             $$ = new Exp(dynamic_cast<Id*>($1));
          } |
 
-         Call {$$ = new Exp(dynamic_cast<Call*>($1)); dynamic_cast<Exp*>($$)->var = freshVar();} |
+         Call {$$ = new Exp(dynamic_cast<Call*>($1)); dynamic_cast<Exp*>($$)->var =dynamic_cast<Call*>($1)->var ;} |
          NUM {$$ = new Exp("INT"); numCommand(dynamic_cast<Exp*>($$), dynamic_cast<Num*>($1)); } |
          NUM B { dynamic_cast<Num*>($1)->checkNumByte(); $$ = new Exp("BYTE"); numCommand(dynamic_cast<Exp*>($$), dynamic_cast<Num*>($1)); } |
-         STRING {$$ = new Exp("STRING");} |
+         STRING {$$ = new Exp(dynamic_cast<String*>($1));} |
          TRUE {$$ = new Exp("BOOL"); trueCommand(dynamic_cast<Exp*>($$));} |
          FALSE {$$ = new Exp("BOOL"); falseCommand(dynamic_cast<Exp*>($$));} |
          NOT Exp {Exp::checkBool(dynamic_cast<Exp*>($2)); $$ = $2; notCommand(dynamic_cast<Exp*>($$));} |
@@ -183,8 +184,7 @@ Exp :    LPAREN Exp RPAREN {$$ = $2;} |
          LPAREN Type RPAREN Exp {Type* type = dynamic_cast<Type*>($2);
                                      Exp* exp = dynamic_cast<Exp*>($4);
                                      Exp::checkCasting(type, exp);
-                                     $$ = new Exp(exp, type);
-                                     dynamic_cast<Exp*>($$)->var = freshVar();}
+                                     $$ = new Exp(exp, type);}
 
 %%
 

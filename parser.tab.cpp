@@ -546,10 +546,10 @@ static const yytype_int8 yytranslate[] =
 static const yytype_uint8 yyrline[] =
 {
        0,    59,    59,    59,    65,    66,    68,    68,    68,    69,
-      72,    75,    77,    79,    82,    87,    87,    94,    94,   103,
-     111,   119,   125,   130,   136,   140,   141,   142,   144,   145,
-     149,   153,   157,   158,   159,   160,   161,   162,   163,   164,
-     164,   172,   172,   179,   181,   183
+      72,    75,    77,    79,    82,    88,    88,    95,    95,   104,
+     112,   120,   126,   131,   137,   141,   142,   143,   145,   146,
+     150,   154,   158,   159,   160,   161,   162,   163,   164,   165,
+     165,   173,   173,   180,   182,   184
 };
 #endif
 
@@ -1414,7 +1414,7 @@ yyreduce:
 
   case 3:
 #line 63 "parser.ypp"
-                       {if(!yychar) {stack->removeScope(); delete stack;} generateMainEnd(); cb.printCodeBuffer();}
+                       {if(!yychar) {stack->removeScope(); delete stack;} generateMainEnd(); cb.printGlobalBuffer();cb.printCodeBuffer();}
 #line 1419 "parser.tab.cpp"
     break;
 
@@ -1482,48 +1482,49 @@ yyreduce:
                                                {
                 yyval = new Statement("IF", dynamic_cast<Exp*>(yyvsp[-3]));
                 stack->removeScope();
+                cb.emit("br label %" + dynamic_cast<Exp*>(yyvsp[-3])->falseLabel);
                 cb.emit(dynamic_cast<Exp*>(yyvsp[-3])->falseLabel + ":");
              }
-#line 1488 "parser.tab.cpp"
+#line 1489 "parser.tab.cpp"
     break;
 
   case 15:
-#line 87 "parser.ypp"
+#line 88 "parser.ypp"
                                                       {stack->removeScope(); stack->addScope(); cb.emit(dynamic_cast<Exp*>(yyvsp[-5])->falseLabel + ":");}
-#line 1494 "parser.tab.cpp"
+#line 1495 "parser.tab.cpp"
     break;
 
   case 16:
-#line 87 "parser.ypp"
+#line 88 "parser.ypp"
                                                                                                                                                               {
                 yyval = new Statement("IF ELSE", dynamic_cast<Exp*>(yyvsp[-7]));
                 stack->removeScope();
                 cb.emit("br label %" + dynamic_cast<N*>(yyvsp[-2])->next);
                 cb.emit(dynamic_cast<N*>(yyvsp[-2])->next + ":");
              }
-#line 1505 "parser.tab.cpp"
+#line 1506 "parser.tab.cpp"
     break;
 
   case 17:
-#line 94 "parser.ypp"
+#line 95 "parser.ypp"
                                         {stack->addScope(); Exp::checkBool(dynamic_cast<Exp*>(yyvsp[-1])); countLoop++; cb.emit(dynamic_cast<Exp*>(yyvsp[-1])->trueLabel + ":");
               startLoop.push_back(dynamic_cast<N*>(yyvsp[-2])->next);
               endLoop.push_back(dynamic_cast<Exp*>(yyvsp[-1])->falseLabel);}
-#line 1513 "parser.tab.cpp"
+#line 1514 "parser.tab.cpp"
     break;
 
   case 18:
-#line 97 "parser.ypp"
+#line 98 "parser.ypp"
              {new Statement("WHILE", dynamic_cast<Exp*>(yyvsp[-4])); stack->removeScope(); countLoop--;
              cb.emit("br label %" + dynamic_cast<N*>(yyvsp[-4])->next);
              cb.emit(dynamic_cast<Exp*>(yyvsp[-3])->falseLabel + ":");
              startLoop.pop_back();
              endLoop.pop_back();}
-#line 1523 "parser.tab.cpp"
+#line 1524 "parser.tab.cpp"
     break;
 
   case 19:
-#line 103 "parser.ypp"
+#line 104 "parser.ypp"
                       {
                 if (!countLoop) {
                     output::errorUnexpectedBreak(yylineno);
@@ -1531,11 +1532,11 @@ yyreduce:
                 }
                 cb.emit("br label %" + endLoop.back());
              }
-#line 1535 "parser.tab.cpp"
+#line 1536 "parser.tab.cpp"
     break;
 
   case 20:
-#line 111 "parser.ypp"
+#line 112 "parser.ypp"
                          {
                 if (!countLoop) {
                     output::errorUnexpectedContinue(yylineno);
@@ -1543,144 +1544,144 @@ yyreduce:
                 }
                 cb.emit("br label %" + startLoop.back());
              }
-#line 1547 "parser.tab.cpp"
+#line 1548 "parser.tab.cpp"
     break;
 
   case 21:
-#line 119 "parser.ypp"
+#line 120 "parser.ypp"
             {
             Exp::checkBool(dynamic_cast<Exp*>(yyvsp[(-1) - (0)]));
             stack->addScope();
             cb.emit(dynamic_cast<Exp*>(yyvsp[(-1) - (0)])->trueLabel + ":");
          }
-#line 1557 "parser.tab.cpp"
+#line 1558 "parser.tab.cpp"
     break;
 
   case 22:
-#line 125 "parser.ypp"
+#line 126 "parser.ypp"
            {
             yyval = new N(cb.freshLabel());
             cb.emit("br label %" + dynamic_cast<N*>(yyval)->next);
         }
-#line 1566 "parser.tab.cpp"
+#line 1567 "parser.tab.cpp"
     break;
 
   case 23:
-#line 130 "parser.ypp"
+#line 131 "parser.ypp"
             {
             yyval = new N(cb.freshLabel());
             cb.emit("br label %" +dynamic_cast<N*>(yyval)->next );
             cb.emit(dynamic_cast<N*>(yyval)->next + ":");
         }
-#line 1576 "parser.tab.cpp"
+#line 1577 "parser.tab.cpp"
     break;
 
   case 24:
-#line 136 "parser.ypp"
+#line 137 "parser.ypp"
                             {
             yyval = new Call(dynamic_cast<Id*>(yyvsp[-3]),dynamic_cast<Exp*>(yyvsp[-1]));
         }
-#line 1584 "parser.tab.cpp"
+#line 1585 "parser.tab.cpp"
     break;
 
   case 25:
-#line 140 "parser.ypp"
+#line 141 "parser.ypp"
              {yyval = new Type("INT");}
-#line 1590 "parser.tab.cpp"
+#line 1591 "parser.tab.cpp"
     break;
 
   case 26:
-#line 141 "parser.ypp"
+#line 142 "parser.ypp"
               {yyval = new Type("BYTE");}
-#line 1596 "parser.tab.cpp"
+#line 1597 "parser.tab.cpp"
     break;
 
   case 27:
-#line 142 "parser.ypp"
+#line 143 "parser.ypp"
               {yyval = new Type("BOOL");}
-#line 1602 "parser.tab.cpp"
+#line 1603 "parser.tab.cpp"
     break;
 
   case 28:
-#line 144 "parser.ypp"
+#line 145 "parser.ypp"
                            {yyval = yyvsp[-1];}
-#line 1608 "parser.tab.cpp"
+#line 1609 "parser.tab.cpp"
     break;
 
   case 29:
-#line 145 "parser.ypp"
+#line 146 "parser.ypp"
                         {Exp::checkNumeric(dynamic_cast<Exp*>(yyvsp[-2]),dynamic_cast<Exp*>(yyvsp[0])); yyval = new Exp(Exp::resultType(dynamic_cast<Exp*>(yyvsp[-2]),dynamic_cast<Exp*>(yyvsp[0])));
                             opCommand(dynamic_cast<Exp*>(yyval), dynamic_cast<Exp*>(yyvsp[-2]),dynamic_cast<Exp*>(yyvsp[0]),dynamic_cast<Operator*>(yyvsp[-1]));
                             }
-#line 1616 "parser.tab.cpp"
+#line 1617 "parser.tab.cpp"
     break;
 
   case 30:
-#line 149 "parser.ypp"
+#line 150 "parser.ypp"
                         {Exp::checkNumeric(dynamic_cast<Exp*>(yyvsp[-2]),dynamic_cast<Exp*>(yyvsp[0])); yyval = new Exp(Exp::resultType(dynamic_cast<Exp*>(yyvsp[-2]),dynamic_cast<Exp*>(yyvsp[0])));
                             opCommand(dynamic_cast<Exp*>(yyval), dynamic_cast<Exp*>(yyvsp[-2]),dynamic_cast<Exp*>(yyvsp[0]),dynamic_cast<Operator*>(yyvsp[-1]));
                              }
-#line 1624 "parser.tab.cpp"
+#line 1625 "parser.tab.cpp"
     break;
 
   case 31:
-#line 153 "parser.ypp"
+#line 154 "parser.ypp"
             {
             yyval = new Exp(dynamic_cast<Id*>(yyvsp[0]));
          }
-#line 1632 "parser.tab.cpp"
+#line 1633 "parser.tab.cpp"
     break;
 
   case 32:
-#line 157 "parser.ypp"
-              {yyval = new Exp(dynamic_cast<Call*>(yyvsp[0])); dynamic_cast<Exp*>(yyval)->var = freshVar();}
-#line 1638 "parser.tab.cpp"
+#line 158 "parser.ypp"
+              {yyval = new Exp(dynamic_cast<Call*>(yyvsp[0])); dynamic_cast<Exp*>(yyval)->var =dynamic_cast<Call*>(yyvsp[0])->var ;}
+#line 1639 "parser.tab.cpp"
     break;
 
   case 33:
-#line 158 "parser.ypp"
+#line 159 "parser.ypp"
              {yyval = new Exp("INT"); numCommand(dynamic_cast<Exp*>(yyval), dynamic_cast<Num*>(yyvsp[0])); }
-#line 1644 "parser.tab.cpp"
+#line 1645 "parser.tab.cpp"
     break;
 
   case 34:
-#line 159 "parser.ypp"
+#line 160 "parser.ypp"
                { dynamic_cast<Num*>(yyvsp[-1])->checkNumByte(); yyval = new Exp("BYTE"); numCommand(dynamic_cast<Exp*>(yyval), dynamic_cast<Num*>(yyvsp[-1])); }
-#line 1650 "parser.tab.cpp"
+#line 1651 "parser.tab.cpp"
     break;
 
   case 35:
-#line 160 "parser.ypp"
-                {yyval = new Exp("STRING");}
-#line 1656 "parser.tab.cpp"
+#line 161 "parser.ypp"
+                {yyval = new Exp(dynamic_cast<String*>(yyvsp[0]));}
+#line 1657 "parser.tab.cpp"
     break;
 
   case 36:
-#line 161 "parser.ypp"
+#line 162 "parser.ypp"
               {yyval = new Exp("BOOL"); trueCommand(dynamic_cast<Exp*>(yyval));}
-#line 1662 "parser.tab.cpp"
+#line 1663 "parser.tab.cpp"
     break;
 
   case 37:
-#line 162 "parser.ypp"
+#line 163 "parser.ypp"
                {yyval = new Exp("BOOL"); falseCommand(dynamic_cast<Exp*>(yyval));}
-#line 1668 "parser.tab.cpp"
+#line 1669 "parser.tab.cpp"
     break;
 
   case 38:
-#line 163 "parser.ypp"
+#line 164 "parser.ypp"
                  {Exp::checkBool(dynamic_cast<Exp*>(yyvsp[0])); yyval = yyvsp[0]; notCommand(dynamic_cast<Exp*>(yyval));}
-#line 1674 "parser.tab.cpp"
+#line 1675 "parser.tab.cpp"
     break;
 
   case 39:
-#line 164 "parser.ypp"
+#line 165 "parser.ypp"
                  { cb.emit(dynamic_cast<Exp*>(yyvsp[-1])->trueLabel + ":"); }
-#line 1680 "parser.tab.cpp"
+#line 1681 "parser.tab.cpp"
     break;
 
   case 40:
-#line 164 "parser.ypp"
+#line 165 "parser.ypp"
                                                                            {
             Exp::checkBool(dynamic_cast<Exp*>(yyvsp[-3]));
             Exp::checkBool(dynamic_cast<Exp*>(yyvsp[0]));
@@ -1688,47 +1689,46 @@ yyreduce:
             yyval = new Exp("BOOL");
             andCommand(dynamic_cast<Exp*>(yyval), dynamic_cast<Exp*>(yyvsp[-3]), dynamic_cast<Exp*>(yyvsp[0]));
          }
-#line 1692 "parser.tab.cpp"
+#line 1693 "parser.tab.cpp"
     break;
 
   case 41:
-#line 172 "parser.ypp"
+#line 173 "parser.ypp"
                 { cb.emit(dynamic_cast<Exp*>(yyvsp[-1])->falseLabel + ":"); }
-#line 1698 "parser.tab.cpp"
+#line 1699 "parser.tab.cpp"
     break;
 
   case 42:
-#line 172 "parser.ypp"
+#line 173 "parser.ypp"
                                                                            {
             Exp::checkBool(dynamic_cast<Exp*>(yyvsp[-3]));
             Exp::checkBool(dynamic_cast<Exp*>(yyvsp[0]));
             yyval = new Exp("BOOL");
             orCommand(dynamic_cast<Exp*>(yyval), dynamic_cast<Exp*>(yyvsp[-3]), dynamic_cast<Exp*>(yyvsp[0]));
          }
-#line 1709 "parser.tab.cpp"
+#line 1710 "parser.tab.cpp"
     break;
 
   case 43:
-#line 179 "parser.ypp"
+#line 180 "parser.ypp"
                        {Exp::checkNumeric(dynamic_cast<Exp*>(yyvsp[-2]), dynamic_cast<Exp*>(yyvsp[0])); yyval = new Exp("BOOL");
          relopCommand(dynamic_cast<Exp*>(yyval), dynamic_cast<Exp*>(yyvsp[-2]),dynamic_cast<Exp*>(yyvsp[0]),dynamic_cast<Operator*>(yyvsp[-1])); }
-#line 1716 "parser.tab.cpp"
+#line 1717 "parser.tab.cpp"
     break;
 
   case 44:
-#line 181 "parser.ypp"
+#line 182 "parser.ypp"
                        {Exp::checkNumeric(dynamic_cast<Exp*>(yyvsp[-2]), dynamic_cast<Exp*>(yyvsp[0])); yyval = new Exp("BOOL");
          releqCommand(dynamic_cast<Exp*>(yyval), dynamic_cast<Exp*>(yyvsp[-2]),dynamic_cast<Exp*>(yyvsp[0]),dynamic_cast<Operator*>(yyvsp[-1]));}
-#line 1723 "parser.tab.cpp"
+#line 1724 "parser.tab.cpp"
     break;
 
   case 45:
-#line 183 "parser.ypp"
+#line 184 "parser.ypp"
                                 {Type* type = dynamic_cast<Type*>(yyvsp[-2]);
                                      Exp* exp = dynamic_cast<Exp*>(yyvsp[0]);
                                      Exp::checkCasting(type, exp);
-                                     yyval = new Exp(exp, type);
-                                     dynamic_cast<Exp*>(yyval)->var = freshVar();}
+                                     yyval = new Exp(exp, type);}
 #line 1733 "parser.tab.cpp"
     break;
 

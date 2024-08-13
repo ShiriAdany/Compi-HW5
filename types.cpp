@@ -27,7 +27,16 @@ void Num::checkNumByte() {
 Id::Id(const std::string& n) : name(n) {}
 
 //------------------------------------------------------------------
-String::String(const std::string& v) : val(v) {}
+String::String(const std::string& v){
+    this->val = v;
+    this->name = freshVar();
+
+    val.erase(0, 1); // Remove the first character
+    val.erase(val.length() - 1, 1);
+
+    this->length=val.length() + 1;
+    cb.emitGlobal("@."+name + " = internal constant [" + to_string(length) +" x i8] c\"" + val +"\\00\"");
+}
 
 //------------------------------------------------------------------
 Statement::Statement(Node* node){
@@ -138,9 +147,15 @@ Call::Call(Id* id, Exp* exp){
     this->argType = sym->argType;
     this->name = sym->name;
     std::string retVal = freshVar();
-    "call i32 @fn_fib(i32 10)"
+    this->var = retVal;
     if (returnType == "INT")
-    cb.emit("call ")
+        cb.emit("%"+retVal+" = call i32 @readi(i32 %" + exp->var+ ")");
+    else if(name == "printi"){
+        cb.emit("call void @printi(i32 %" + exp->var+ ")");
+    }
+    else{
+        cb.emit("call void @print(i8* getelementptr (["+ to_string(exp->length) +" x i8], ["+ to_string(exp->length) +" x i8]* @." + exp->var + ", i32 0, i32 0))");
+    }
 }
 
 void Call::checkFunc(Symbol* sym, Exp* exp) {
@@ -168,11 +183,25 @@ Exp::Exp(Exp* exp, Type *type) {
 
     Type* casted_type = dynamic_cast<Type*>(type);
     this->type = casted_type->type;
-    this->var = exp->var;
+    if(this->type == "BYTE"){
+        std::string tmpVar = freshVar();
+        cb.emit("\n%" + tmpVar + " = " + "and i32 %" + exp->var+ ", 255");
+        this->var = tmpVar;
+    }
+    else{
+        this->var = exp->var;
+    }
+
 
 }
 
 Exp::Exp(const std::string& type):type(type), var(""){}
+
+Exp::Exp(String* str){
+    this->type = "STRING";
+    this->var = str->name;
+    this->length = str->length;
+}
 
 Exp::Exp(Id* id)
 {

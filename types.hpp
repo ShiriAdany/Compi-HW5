@@ -39,8 +39,10 @@ public:
 };
 
 class String : public Node {
-    std::string val;
 public:
+    std::string val;
+    std::string name;
+    int length;
     String(const std::string& v);
 };
 
@@ -60,12 +62,14 @@ public:
     std::string var;
     std::string trueLabel;
     std::string falseLabel;
+    int length;
     Exp() : type("void"), var("") {}
     Exp(Exp *exp);
     Exp(Id* id);
     Exp(Call* call);
     Exp(Exp* exp,Type *type);
     Exp(const std::string& type);
+    Exp(String* str);
 
     static void checkNumeric(Exp* left, Exp* right);
     static void checkCasting(Type* type, Exp* exp);
@@ -85,6 +89,7 @@ public:
     std::string returnType;
     std::string name;
     std::string argType;
+    std::string var;
     Call(Id *id, Exp *exp);
 
     void checkFunc(Symbol* sym, Exp* exp);
