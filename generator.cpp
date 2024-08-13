@@ -15,7 +15,7 @@ void generateMainStart(const std::string& sp) {
     std::string funcs = buffer.str();
     cb.emit(funcs);
 
-    cb.emit("@.divZero = internal constant [23 x i8] c\"Error division by zero\\00\"\n");
+    cb.emit("@.divZero = internal constant [24 x i8] c\"Error division by zero\\0a\\00\"");
     cb.emit("define i32 @main(){\n");
     cb.emit("%" + sp + " = alloca i32, i32 50");
 
@@ -43,7 +43,7 @@ void opCommand(Exp* e, Exp* left, Exp* right, Operator* o){
         res = "%" + cond + "=icmp eq i32 0 ,%" + right->var + "\n" +
               "br i1 %" + cond + ",label %" + errorDiv + " ,label %" + goodDiv + "\n" +
               errorDiv  + ":" + "\n" +
-              "call i32 (i8*, ...) @printf(i8* getelementptr ([23 x i8], [23 x i8]* @.divZero, i32 0, i32 0))" + "\n" +
+              "call i32 (i8*, ...) @printf(i8* getelementptr ([24 x i8], [24 x i8]* @.divZero, i32 0, i32 0))" + "\n" +
               "ret i32 0" + "\n" +
               goodDiv + ":" + "\n";
 
