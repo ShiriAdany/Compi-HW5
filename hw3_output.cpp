@@ -13,8 +13,7 @@ void output::printID(const string& id, int offset, const string& type) {
 }
 
 string output::makeFunctionType(const string& argType, const string& retType) {
-    
-//    return "(" + argType + ")" + "->" + retType;
+    return "(" + argType + ")" + "->" + retType;
 }
 
 void output::errorLex(int lineno){
